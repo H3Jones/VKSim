@@ -249,6 +249,8 @@ body <- dashboardBody(
                     box(width = NULL,
                         column(width = 12,
                                downloadButton("download_violin_plot","Download Plot"),
+                               materialSwitch("violin_filter_classes","Filter classes"),
+                               selectizeInput("violin_class_filter","Select classes", choices = c("HC", "O1")),
                                plotOutput("violin_plot", height = "600px")
                         ),
                         title = "Violin plot",
@@ -257,8 +259,8 @@ body <- dashboardBody(
                 )),
         tabItem(tabName = "Options",
                 fluidPage(
-                           box(width = 6,
-                           h4("Options for the format of the graphics downloaded: "),
+                    box(width = 6,
+                        h4("Options for downloaded graphics"),
                            radioButtons(inputId = "unitsGraph", label = "Select the units", choices = list("mm", "cm","in"), selected = "in"),
                            numericInput(inputId = "dpiGraph",label = "DPI of the graphics:", value = 600, max = 2000),
                            numericInput(inputId = "widthGraph",label = "Width of the graphics:", value = 12),
