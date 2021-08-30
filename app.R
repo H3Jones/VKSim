@@ -198,8 +198,15 @@ body <- dashboardBody(
                             )
                         )
                         ),
-                    box(width = NULL, 
-                        downloadButton("download_vk_plot","Download Plot"),
+                    box(width = NULL,
+                        splitLayout(
+                            downloadButton("download_vk_plot","Download Plot"),
+                            materialSwitch("set_limits","Set plot limits")
+                            ),
+                        conditionalPanel(condition = 'input.set_limits',
+                                         numericRangeInput("set_limits_x", "Set O/C axis limits", value = c(0,3)),
+                                         numericRangeInput("set_limits_y", "Set H/C axis limits", value = c(0,3))
+                                         ),
                         plotlyOutput("vk_plot", height = "600px"),
                         div(style = 'overflow-x: scroll', DT::dataTableOutput("vk_datatable")),
                         collapsible = TRUE, title = "Van Krevelen Plot", status = "primary", solidHeader = TRUE
@@ -238,18 +245,27 @@ body <- dashboardBody(
                                ),
                         title = "Class distribution",
                         status = "primary", solidHeader = TRUE
-                        )
+                        ),
+                    box(width = NULL,
+                        column(width = 12,
+                               downloadButton("download_violin_plot","Download Plot"),
+                               plotOutput("violin_plot", height = "600px")
+                        ),
+                        title = "Violin plot",
+                        status = "primary", solidHeader = TRUE
+                    )
                 )),
         tabItem(tabName = "Options",
                 fluidPage(
-                    column(width = 6,
+                           box(width = 6,
                            h4("Options for the format of the graphics downloaded: "),
                            radioButtons(inputId = "unitsGraph", label = "Select the units", choices = list("mm", "cm","in"), selected = "in"),
                            numericInput(inputId = "dpiGraph",label = "DPI of the graphics:", value = 600, max = 2000),
                            numericInput(inputId = "widthGraph",label = "Width of the graphics:", value = 12),
                            numericInput(inputId = "heightGraph",label = "Height of the graphics:", value = 8),
                            select_plot_file_type(inputId = "plot_format",label = "Select the file type")
-                    )
+                           )
+                    
                 ))
         
         
@@ -402,7 +418,7 @@ server <- function(input, output, session) {
             mutate(unchanged = lag(formula) == formula) %>%
             ungroup() %>%
             group_by(Iter) %>%
-            summarise(unreacted = sum(unchanged)) %>%
+            summarise(unreacted = sum(unchanged), .groups = "drop_last") %>%
             left_join(., reaction_details, by = "Iter") %>%
             mutate(reacted = n_molecules - unreacted) 
     })
@@ -456,6 +472,7 @@ server <- function(input, output, session) {
         
         data <- filter_iter(tidy_data())
         
+        
         data %>%
             group_by(.,H_C, O_C, Iter) %>%
             mutate(n = n()) %>%
@@ -466,7 +483,8 @@ server <- function(input, output, session) {
                 y = "H/C",
                 x = "O/C",
                 fill = "Iteration"
-            )
+            ) +
+            {if(input$set_limits) expand_limits(x = input$set_limits_x, y = input$set_limits_y)}
     })
     
     output$vk_plot <- renderPlotly({
@@ -582,8 +600,7 @@ server <- function(input, output, session) {
                    O > 0 ~ paste0("O",O)
                )) %>%
                group_by(Iter, class) %>%
-               summarise(n = n()) %>%
-               ungroup() %>%
+               summarise(n = n(), .groups = "drop") %>%
                complete(class,Iter, fill = list(n = 0)) %>%
                ggplot(aes(
                    x = factor(class, levels = str_sort(unique(class), numeric = TRUE), ordered = TRUE),
@@ -619,7 +636,44 @@ server <- function(input, output, session) {
         } 
     )
     
+
+# Violin Plot -------------------------------------------------------------
+
+    density_data <- reactive({
+        filter_iter(tidy_data()) %>%
+            mutate(class = case_when(
+                O == 0 ~ "HC",
+                O > 0 ~ paste0("O",O)
+            )) %>%
+            ggplot(aes(class, H_C, fill = factor(Iter))) +
+            geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))+
+            scale_fill_viridis_d(end = .8) +
+            labs(
+                y = "H/C",
+                x = "Heteroatom class",
+                fill = "Iteration"
+            )
+        
+    })
     
+    output$violin_plot <- renderPlot({
+        density_data()
+    })
+    
+    output$download_violin_plot <- downloadHandler(
+        filename =  function() {
+            paste("violin_plot", input$plot_format, sep=".")
+        },
+        # content is a function with argument file. content writes the plot to the device
+        content = function(file) {
+            multi_save_plot(file, plot =  density_data(),
+                            type = input$plot_format,
+                            width = input$widthGraph,
+                            height = input$heightGraph,
+                            units = input$unitsGraph,
+                            dpi = input$dpiGraph)
+        } 
+    )
         
 # End ---------------------------------------------------------------------
     
