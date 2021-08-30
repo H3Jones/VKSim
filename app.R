@@ -249,6 +249,10 @@ body <- dashboardBody(
                     box(width = NULL,
                         column(width = 12,
                                downloadButton("download_violin_plot","Download Plot"),
+                               materialSwitch("violin_filter_classes","Filter classes"),
+                               conditionalPanel(condition = 'input.violin_filter_classes',
+                                                selectizeInput("violin_class_filter","Select classes", choices = c("HC", "O1"), multiple = TRUE)
+                                                ),
                                plotOutput("violin_plot", height = "600px")
                         ),
                         title = "Violin plot",
@@ -257,8 +261,8 @@ body <- dashboardBody(
                 )),
         tabItem(tabName = "Options",
                 fluidPage(
-                           box(width = 6,
-                           h4("Options for the format of the graphics downloaded: "),
+                    box(width = 6,
+                        h4("Options for downloaded graphics"),
                            radioButtons(inputId = "unitsGraph", label = "Select the units", choices = list("mm", "cm","in"), selected = "in"),
                            numericInput(inputId = "dpiGraph",label = "DPI of the graphics:", value = 600, max = 2000),
                            numericInput(inputId = "widthGraph",label = "Width of the graphics:", value = 12),
@@ -634,13 +638,28 @@ server <- function(input, output, session) {
     
 
 # Violin Plot -------------------------------------------------------------
-
+    get_classes<-function(tidy_data){
+        tidy_data %>%
+            mutate(class = case_when(
+                O == 0 ~ "HC",
+                O > 0 ~ paste0("O",O)
+            )) %>%
+            pull(class) %>%
+            unique()
+    }
+    
+    observe({
+        req(tidy_data())
+        updateSelectInput(inputId = "violin_class_filter", label = "Select classes", choices = get_classes(tidy_data()))
+    })
+    
     density_data <- reactive({
         filter_iter(tidy_data()) %>%
             mutate(class = case_when(
                 O == 0 ~ "HC",
                 O > 0 ~ paste0("O",O)
             )) %>%
+            {if(input$violin_filter_classes) filter(., class %in% input$violin_class_filter) else .} %>%
             ggplot(aes(class, H_C, fill = factor(Iter))) +
             geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))+
             scale_fill_viridis_d(end = .8) +
