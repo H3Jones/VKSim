@@ -289,11 +289,7 @@ ui <- dashboardPage(
 # Setup Server ------------------------------------------------------------
 
 server <- function(input, output, session) {
-    
-    Lemon500<-read_rds("lemon500.rds")
-    reactive_values <- reactiveValues() 
-    
-    
+   
     raw_masslist<-reactive({
         req(!is.null(input$file_input))
         validate(
