@@ -660,7 +660,11 @@ server <- function(input, output, session) {
                 O > 0 ~ paste0("O",O)
             )) %>%
             {if(input$violin_filter_classes) filter(., class %in% input$violin_class_filter) else .} %>%
-            ggplot(aes(class, H_C, fill = factor(Iter))) +
+            ggplot(aes(
+                x = factor(class, levels = str_sort(unique(class), numeric = TRUE), ordered = TRUE),
+                y = H_C,
+                fill = factor(Iter)
+                )) +
             geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))+
             scale_fill_viridis_d(end = .8) +
             labs(
