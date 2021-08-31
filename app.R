@@ -527,11 +527,11 @@ server <- function(input, output, session) {
         req(tidy_data())
         
         filter_iter(tidy_data()) %>%
-            ggplot(aes(x = O/C, y = after_stat(count), colour = as.factor(Iter))) +
+            ggplot(aes(x = O/C, colour = as.factor(Iter))) +
             geom_density(size =2) +
             scale_colour_viridis_d(end = .8) +
             labs(
-                y = "Number of molecules",
+                y = "Density of molecules",
                 x = "O/C",
                 colour = "Iteration"
             )+
@@ -562,11 +562,11 @@ server <- function(input, output, session) {
         req(tidy_data())
         
         filter_iter(tidy_data()) %>%
-            ggplot(aes(x = H/C, y = after_stat(count), colour = as.factor(Iter))) +
+            ggplot(aes(x = H/C, colour = as.factor(Iter))) +
             geom_density(size =2) +
             scale_colour_viridis_d(end = .8) +
             labs(
-                y = "Number of molecules",
+                y = "Density of molecules",
                 x = "H/C",
                 colour = "Iteration"
             )+
