@@ -451,7 +451,7 @@ server <- function(input, output, session) {
     
     output$download_iter_plot <- downloadHandler(
         filename =  function() {
-            paste("Iteration_plot", input$dl_VKSim_format, sep=".")
+            paste("Iteration_plot", input$plot_format, sep=".")
         },
         # content is a function with argument file. content writes the plot to the device
         content = function(file) {
