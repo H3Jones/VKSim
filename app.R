@@ -145,7 +145,14 @@ sidebar <- dashboardSidebar(
                 menuItem("Input",tabName = "Input",selected = TRUE),
                 menuItem("Simulate",tabName = "Sim"),
                 menuItem("Other plots",tabName = "Plots"),
-                menuItem("Options",tabName = "Options")
+                menuItem("Options",tabName = "Options"),
+                hr(),
+                    materialSwitch("set_limits","Set plot limits"),
+                    conditionalPanel(condition = 'input.set_limits',
+                                 numericRangeInput("set_limits_x", "Set O/C axis limits", value = c(0,3)),
+                                 numericRangeInput("set_limits_y", "Set H/C axis limits", value = c(0,3))
+                )
+                
                 
                 
                 
@@ -199,14 +206,7 @@ body <- dashboardBody(
                         )
                         ),
                     box(width = NULL,
-                        splitLayout(
-                            downloadButton("download_vk_plot","Download Plot"),
-                            materialSwitch("set_limits","Set plot limits")
-                            ),
-                        conditionalPanel(condition = 'input.set_limits',
-                                         numericRangeInput("set_limits_x", "Set O/C axis limits", value = c(0,3)),
-                                         numericRangeInput("set_limits_y", "Set H/C axis limits", value = c(0,3))
-                                         ),
+                        downloadButton("download_vk_plot","Download Plot"),
                         plotlyOutput("vk_plot", height = "600px"),
                         div(style = 'overflow-x: scroll', DT::dataTableOutput("vk_datatable")),
                         collapsible = TRUE, title = "Van Krevelen Plot", status = "primary", solidHeader = TRUE
@@ -534,7 +534,8 @@ server <- function(input, output, session) {
                 y = "Number of molecules",
                 x = "O/C",
                 colour = "Iteration"
-            )
+            )+
+            {if(input$set_limits) expand_limits(x = input$set_limits_x)}
     })
     
     output$OC_plot <- renderPlot({
@@ -568,7 +569,8 @@ server <- function(input, output, session) {
                 y = "Number of molecules",
                 x = "H/C",
                 colour = "Iteration"
-            )
+            )+
+            {if(input$set_limits) expand_limits(x = input$set_limits_y)}
     })
     
     output$HC_plot <- renderPlot({
@@ -671,7 +673,8 @@ server <- function(input, output, session) {
                 y = "H/C",
                 x = "Heteroatom class",
                 fill = "Iteration"
-            )
+            ) +
+            {if(input$set_limits) expand_limits(y = input$set_limits_y)}
         
     })
     
