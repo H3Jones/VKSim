@@ -77,3 +77,28 @@ List generateReactions(List start, List reactions, double min_dbe) {
   
   return outputs;
 }
+
+// [[Rcpp::export]]
+String createReaction(CharacterVector name_vec, std::vector<int> num_vec){
+  String pos_formula("+");
+  String neg_formula("-");
+  std::size_t n = name_vec.size();
+  for(std::size_t i = 0; i < n; ++i){
+    if(num_vec[i] != 0) {
+      String element = name_vec[i];
+      element += std::to_string(abs(num_vec[i]));
+      if(num_vec[i] < 0) {
+        neg_formula.push_back(element);
+      } else {
+        pos_formula.push_back(element);
+      }
+    }
+    else
+    {continue;}
+  }
+  String complete("");
+  if(pos_formula != "+"){complete.push_back(pos_formula);}
+  if(neg_formula != "-"){complete.push_back(neg_formula);}
+  
+  return complete;
+}

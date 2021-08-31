@@ -18,6 +18,7 @@ extract_inputs<-function(string_list){
     vec <- set_names(string_list$raw_vec, c("C","H","O"))
     out <- tibble(!!!vec)
     out$rep <- string_list$rep_value
+    out$reaction <- createReaction(c("C","H","O"), vec)
     return(out)
 }
 
@@ -330,8 +331,7 @@ server <- function(input, output, session) {
     
     reaction_details <- reactive({
         req(length(raw_vector_input()) > 0)
-        map_df(raw_vector_input(), ~extract_inputs(.x)) %>%
-            mutate(reaction = paste0("C",C,"H",H,"O",O))
+        map_df(raw_vector_input(), ~extract_inputs(.x)) 
     })
     
     output$reaction_vectors<-DT::renderDataTable({
