@@ -650,7 +650,7 @@ server <- function(input, output, session) {
     
     observe({
         req(tidy_data())
-        updateSelectInput(inputId = "violin_class_filter", label = "Select classes", choices = get_classes(tidy_data()))
+        updateSelectInput(session = shiny::getDefaultReactiveDomain(), inputId = "violin_class_filter", label = "Select classes", choices = get_classes(tidy_data()))
     })
     
     density_data <- reactive({
