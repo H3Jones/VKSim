@@ -118,7 +118,7 @@ multi_save_plot<-function(file,plot,type,width,height,units,dpi){
 
 #wrapper for plot type selector
 select_plot_file_type<-function(inputId, label = "Select the file type"){
-    radioButtons(inputId = inputId,label = label, choices = list("png", "pdf", "eps", "tiff","svg"))
+    radioButtons(inputId = inputId,label = label, choices = list("png", "pdf", "eps", "tiff","svg"), selected = "png")
 }
 
 # Packages to Load --------------------------------------------------------
@@ -146,17 +146,23 @@ sidebar <- dashboardSidebar(
                 menuItem("Input",tabName = "Input",selected = TRUE),
                 menuItem("Simulate",tabName = "Sim"),
                 menuItem("Other plots",tabName = "Plots"),
-                menuItem("Options",tabName = "Options"),
                 hr(),
                     materialSwitch("set_limits","Set plot limits"),
                     conditionalPanel(condition = 'input.set_limits',
-                                 numericRangeInput("set_limits_x", "Set O/C axis limits", value = c(0,3)),
-                                 numericRangeInput("set_limits_y", "Set H/C axis limits", value = c(0,3))
-                )
-                
-                
-                
-                
+                                     numericRangeInput("set_limits_x", "Set O/C axis limits", value = c(0,3)),
+                                     numericRangeInput("set_limits_y", "Set H/C axis limits", value = c(0,3))
+                                     ),
+                hr(),
+                fluidRow(
+                    column(width = 3, offset = 3,
+                h5("Graphics options")
+                    )
+                ),
+                radioButtons(inputId = "unitsGraph", label = "Select the units", choices = list("mm", "cm","in"), selected = "in"),
+                numericInput(inputId = "dpiGraph",label = "DPI of the graphics:", value = 600, max = 2000),
+                numericInput(inputId = "widthGraph",label = "Width of the graphics:", value = 12),
+                numericInput(inputId = "heightGraph",label = "Height of the graphics:", value = 8),
+                select_plot_file_type(inputId = "plot_format",label = "Select the file type")
     ))
 
 
@@ -259,18 +265,6 @@ body <- dashboardBody(
                         title = "Violin plot",
                         status = "primary", solidHeader = TRUE
                     )
-                )),
-        tabItem(tabName = "Options",
-                fluidPage(
-                    box(width = 6,
-                        h4("Options for downloaded graphics"),
-                           radioButtons(inputId = "unitsGraph", label = "Select the units", choices = list("mm", "cm","in"), selected = "in"),
-                           numericInput(inputId = "dpiGraph",label = "DPI of the graphics:", value = 600, max = 2000),
-                           numericInput(inputId = "widthGraph",label = "Width of the graphics:", value = 12),
-                           numericInput(inputId = "heightGraph",label = "Height of the graphics:", value = 8),
-                           select_plot_file_type(inputId = "plot_format",label = "Select the file type")
-                           )
-                    
                 ))
         
         
