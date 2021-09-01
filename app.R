@@ -129,7 +129,8 @@ suppressPackageStartupMessages(c(
     library(magrittr),
     library(tidyverse),
     library(glue),
-    library(plotly)
+    library(plotly),
+    library(gganimate)
 ))
 
 #Rcpp::sourceCpp("VKSim_cpp_funs.cpp")
@@ -146,6 +147,7 @@ sidebar <- dashboardSidebar(
                 menuItem("Input",tabName = "Input",selected = TRUE),
                 menuItem("Simulate",tabName = "Sim"),
                 menuItem("Other plots",tabName = "Plots"),
+                menuItem("Gif",tabName = "Gif"),
                 hr(),
                     materialSwitch("set_limits","Set plot limits"),
                     conditionalPanel(condition = 'input.set_limits',
@@ -265,6 +267,10 @@ body <- dashboardBody(
                         title = "Violin plot",
                         status = "primary", solidHeader = TRUE
                     )
+                )),
+        tabItem(tabName = "Gif",
+                fluidPage(
+                    imageOutput("vk_gif")
                 ))
         
         
@@ -690,6 +696,29 @@ server <- function(input, output, session) {
                             dpi = input$dpiGraph)
         } 
     )
+
+# Generate gif ------------------------------------------------------------
+    output$vk_gif <- renderImage({
+        # A temp file to save the output.
+        # This file will be removed later by renderImage
+        outfile <- tempfile(fileext='.gif')
+        
+        # now make the animation
+        p = vk_plot() +
+            transition_manual(Iter) +
+            labs(subtitle = "Iteration: {current_frame}")
+        
+        anim_save("outfile.gif", animate(p)) # New
+        
+        # Return a list containing the filename
+        list(src = "outfile.gif",
+             contentType = 'image/gif'
+             # width = 400,
+             # height = 300,
+             # alt = "This is alternate text"
+        )}, deleteFile = TRUE)
+    
+    
         
 # End ---------------------------------------------------------------------
     
