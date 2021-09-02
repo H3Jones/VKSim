@@ -164,6 +164,7 @@ sidebar <- dashboardSidebar(
                 numericInput(inputId = "dpiGraph",label = "DPI of the graphics:", value = 600, max = 2000),
                 numericInput(inputId = "widthGraph",label = "Width of the graphics:", value = 12),
                 numericInput(inputId = "heightGraph",label = "Height of the graphics:", value = 8),
+                numericInput(inputId = "textSize",label = "Text size", value = 16),
                 select_plot_file_type(inputId = "plot_format",label = "Select the file type")
     ))
 
@@ -441,7 +442,8 @@ server <- function(input, output, session) {
                 y = "Number of molecules",
                 x = "Iteration",
                 fill = ""
-            )
+            ) +
+            theme(text = element_text(size = input$textSize))
             
     })
     
@@ -484,7 +486,8 @@ server <- function(input, output, session) {
                 x = "O/C",
                 fill = "Iteration"
             ) +
-            {if(input$set_limits) expand_limits(x = input$set_limits_x, y = input$set_limits_y)}
+            {if(input$set_limits) expand_limits(x = input$set_limits_x, y = input$set_limits_y)} +
+            theme(text = element_text(size = input$textSize))
     })
     
     output$vk_plot <- renderPlotly({
@@ -535,7 +538,8 @@ server <- function(input, output, session) {
                 x = "O/C",
                 colour = "Iteration"
             )+
-            {if(input$set_limits) expand_limits(x = input$set_limits_x)}
+            {if(input$set_limits) expand_limits(x = input$set_limits_x)} +
+            theme(text = element_text(size = input$textSize))
     })
     
     output$OC_plot <- renderPlot({
@@ -570,7 +574,8 @@ server <- function(input, output, session) {
                 x = "H/C",
                 colour = "Iteration"
             )+
-            {if(input$set_limits) expand_limits(x = input$set_limits_y)}
+            {if(input$set_limits) expand_limits(x = input$set_limits_y)}+
+            theme(text = element_text(size = input$textSize))
     })
     
     output$HC_plot <- renderPlot({
@@ -615,7 +620,8 @@ server <- function(input, output, session) {
                    y = "Number of molecules",
                    x = "Heteroatom class",
                    fill = "Iteration"
-               )
+               )+
+               theme(text = element_text(size = input$textSize))
                
        }) 
     
@@ -674,7 +680,8 @@ server <- function(input, output, session) {
                 x = "Heteroatom class",
                 fill = "Iteration"
             ) +
-            {if(input$set_limits) expand_limits(y = input$set_limits_y)}
+            {if(input$set_limits) expand_limits(y = input$set_limits_y)}+
+            theme(text = element_text(size = input$textSize))
         
     })
     
@@ -708,7 +715,7 @@ server <- function(input, output, session) {
             transition_manual(Iter) +
             labs(subtitle = "Iteration: {current_frame}")
         
-        anim_save("outfile.gif", animate(p)) # New
+        anim_save("outfile.gif", p) # New
         
         # Return a list containing the filename
         list(src = "outfile.gif",
