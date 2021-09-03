@@ -5,7 +5,12 @@
 string_to_list<-function(string_vec){
     if(any(is.na(as.numeric(string_vec[1:3])))) return(NULL)
     
-    rep_value <- if(is.na(as.numeric(string_vec[4]))) 1 else as.numeric(string_vec[4])
+    raw_rep_value <-  as.numeric(string_vec[4])
+    rep_value <- if (is.na(raw_rep_value) | raw_rep_value <= 0) {
+        1
+    } else {
+        raw_rep_value
+    }
     
     vec <- as.numeric(string_vec[1:3])
     list(
@@ -186,6 +191,11 @@ body <- dashboardBody(
                                              ".csv"))
                         ),
                     box(width = NULL,
+                        materialSwitch("filter_data","Filter Data"),
+                        conditionalPanel(condition = "input.filter_data",
+                                         numericRangeInput("filter_carbon","Filter Carbon Number range", value = c(0,30)),
+                                         numericRangeInput("filter_dbe","Filter DBE range", value = c(0,10))
+                        ),
                         div(style = 'overflow-x: scroll', DT::dataTableOutput("neutral_data")),
                         collapsible = TRUE, title = "Neutral Data", status = "primary", solidHeader = TRUE
                         )
@@ -308,9 +318,9 @@ server <- function(input, output, session) {
     
     
     
-    output$debug <- renderText({
-        "debug"
-        })
+    # output$debug <- renderText({
+    #     input$list_input
+    #     })
     
     
     
@@ -323,7 +333,8 @@ server <- function(input, output, session) {
         
         str_split(input$list_input,"\n") %>%
             unlist() %>% 
-            str_extract_all("(-?)[:digit:]+") %>%
+            str_extract_all("(#?)(-?)[:digit:]+") %>%
+            keep(~!any(str_detect(.x, "#"))) %>%
             keep(~length(.x) >= 3) %>%
             map(~string_to_list(.x)) %>%
             keep(~!is_null(.x))
@@ -351,7 +362,11 @@ server <- function(input, output, session) {
         raw_masslist() %>%
             filter(isotope == FALSE) %>%
             filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
-            mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd'))
+            mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')) %>%
+            {if(input$filter_data) filter(., 
+                                          between(C,input$filter_carbon[[1]],input$filter_carbon[[2]]) &
+                                              between(dbe,input$filter_dbe[[1]],input$filter_dbe[[2]]) 
+                                          ) else .}
             #mutate(nH = adjust_H(H, electron_status, ion_polarity)) 
     })
     
