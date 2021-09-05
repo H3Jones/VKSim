@@ -191,6 +191,10 @@ body <- dashboardBody(
                                              ".csv"))
                         ),
                     box(width = NULL,
+                        materialSwitch("filter_mass","Filter by m/z"),
+                        conditionalPanel(condition = "input.filter_mass",
+                                         numericRangeInput("filter_mz","Filter m/z range", value = c(0,1500))
+                        ),
                         materialSwitch("filter_data","Filter Data"),
                         conditionalPanel(condition = "input.filter_data",
                                          numericRangeInput("filter_carbon","Filter Carbon Number range", value = c(0,30)),
@@ -360,11 +364,12 @@ server <- function(input, output, session) {
     
     filtered_data <- reactive({
         req(raw_masslist())
-        ion_polarity <- ion_polarity_finder(raw_masslist())
+        #ion_polarity <- ion_polarity_finder(raw_masslist())
         raw_masslist() %>%
             filter(isotope == FALSE) %>%
             filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
             mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')) %>%
+            {if(input$filter_mass) filter(., between(assigned.mz,input$filter_mz[[1]],input$filter_mz[[2]])) else .} %>%
             {if(input$filter_data) filter(., 
                                           between(C,input$filter_carbon[[1]],input$filter_carbon[[2]]) &
                                               between(dbe,input$filter_dbe[[1]],input$filter_dbe[[2]]) &
