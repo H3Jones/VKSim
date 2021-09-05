@@ -194,7 +194,9 @@ body <- dashboardBody(
                         materialSwitch("filter_data","Filter Data"),
                         conditionalPanel(condition = "input.filter_data",
                                          numericRangeInput("filter_carbon","Filter Carbon Number range", value = c(0,30)),
-                                         numericRangeInput("filter_dbe","Filter DBE range", value = c(0,10))
+                                         numericRangeInput("filter_dbe","Filter DBE range", value = c(0,10)),
+                                         numericRangeInput("filter_HC","Filter H/C range", value = c(0,4)),
+                                         numericRangeInput("filter_OC","Filter O/C range", value = c(0,2))
                         ),
                         div(style = 'overflow-x: scroll', DT::dataTableOutput("neutral_data")),
                         collapsible = TRUE, title = "Neutral Data", status = "primary", solidHeader = TRUE
@@ -365,7 +367,10 @@ server <- function(input, output, session) {
             mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')) %>%
             {if(input$filter_data) filter(., 
                                           between(C,input$filter_carbon[[1]],input$filter_carbon[[2]]) &
-                                              between(dbe,input$filter_dbe[[1]],input$filter_dbe[[2]]) 
+                                              between(dbe,input$filter_dbe[[1]],input$filter_dbe[[2]]) &
+                                              between(H/C,input$filter_HC[[1]],input$filter_HC[[2]]) &
+                                              between(O/C,input$filter_OC[[1]],input$filter_OC[[2]])
+                                              
                                           ) else .}
             #mutate(nH = adjust_H(H, electron_status, ion_polarity)) 
     })
