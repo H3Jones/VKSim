@@ -2,6 +2,14 @@
 
 #helper functions
 
+check_file_input<-function(file_path, file_type){
+    switch(file_type,
+           "Composer64" = ifelse(!is.na(KairosMSfunctions::determine_file_format(file_path)),NULL,"Ensure file is the correct type"),
+            "CHO" =    ifelse(readr::read_lines(file_path, n_max = 1),NULL,"Ensure file is the correct type")
+        
+    )
+}
+
 string_to_list<-function(string_vec){
     if(any(is.na(as.numeric(string_vec[1:3])))) return(NULL)
     
@@ -183,6 +191,7 @@ body <- dashboardBody(
         tabItem(tabName = "Input",
                 fluidPage(
                     box(width = NULL,
+                        selectInput("file_type","Select input type",choices = c("Composer64","C,H,O values" = "CHO")),
                         fileInput(inputId = "file_input",
                                   label = "Choose data",
                                   multiple= TRUE,
@@ -315,9 +324,18 @@ server <- function(input, output, session) {
     raw_masslist<-reactive({
         req(!is.null(input$file_input))
         validate(
-            need(!is.na(KairosMSfunctions::determine_file_format(input$file_input$datapath)), "Ensure file is the correct type")
+            check_file_input(file_path = input$file_input$datapath,
+                             file_type = input$file_type)
         )
-        KairosMSfunctions::Master_ReadeR(file_to_read = input$file_input$datapath)
+        switch(input$file_type,
+               "Composer64" = KairosMSfunctions::Master_ReadeR(file_to_read = input$file_input$datapath),
+               "CHO" = readr::read_csv(input$file_input$datapath, col_types = cols(
+                   C = col_double(),
+                   H = col_double(),
+                   O = col_number()
+               ))
+               )
+        
     })
     
     
@@ -364,11 +382,21 @@ server <- function(input, output, session) {
     
     filtered_data <- reactive({
         req(raw_masslist())
-        #ion_polarity <- ion_polarity_finder(raw_masslist())
         raw_masslist() %>%
-            filter(isotope == FALSE) %>%
-            filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
-            mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')) %>%
+            {
+                if(all(c("assigned.mz","peak.mz") %in% colnames(.))) 
+                    {
+                    filter(.,isotope == FALSE) %>%
+                        filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
+                        mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')) 
+                    
+                    } else {
+                        mutate(.,
+                               assigned.mz = C*12 + H + O*16,
+                               dbe = C -H/2 +1
+                        )
+                    }
+            } %>%
             {if(input$filter_mass) filter(., between(assigned.mz,input$filter_mz[[1]],input$filter_mz[[2]])) else .} %>%
             {if(input$filter_data) filter(., 
                                           between(C,input$filter_carbon[[1]],input$filter_carbon[[2]]) &
