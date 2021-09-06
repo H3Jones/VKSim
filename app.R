@@ -1,13 +1,29 @@
 
 
 #helper functions
+check_CHO_file<-function(file_path){
+    if(all(colnames(readr::read_csv(file_path, n_max = 5)) %in% c("C", "H", "O"))) {
+        return(NULL)
+    } else {
+            return("Ensure file is the correct type")
+        }
+}
+
+check_Composer64<-function(file_path){
+    if(!is.na(KairosMSfunctions::determine_file_format(file_path))) {
+        return(NULL)
+    } else {
+        return("Ensure file is the correct type")
+    }
+}
 
 check_file_input<-function(file_path, file_type){
     switch(file_type,
-           "Composer64" = ifelse(!is.na(KairosMSfunctions::determine_file_format(file_path)),NULL,"Ensure file is the correct type"),
-            "CHO" =    ifelse(readr::read_lines(file_path, n_max = 1),NULL,"Ensure file is the correct type")
-        
-    )
+           "Composer64" = check_Composer64(file_path),
+            "CHO" =  check_CHO_file(file_path),
+           "Ensure file is the correct type"
+           )
+    
 }
 
 string_to_list<-function(string_vec){
