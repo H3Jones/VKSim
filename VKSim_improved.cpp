@@ -18,11 +18,12 @@ std::tuple<NumericVector, bool> reactMolecule(NumericVector x, NumericVector y, 
     if(temp < 0) break;
     out[i] = temp;
   }
-  
+  // C, H, O
   double H_C = out[1]/out[0];
+  double O_C = out[2]/out[0];
   double dbe = calcDBE(out);
   
-  bool unchanged = ((temp < 0) | (H_C < 0.2) | (H_C > 3.1) | (dbe < min_dbe)); 
+  bool unchanged = ((temp < 0) | (H_C < 0.2) | (H_C > 3.1) | (O_C < 0) | (O_C > 1.2) | (dbe < min_dbe)); 
   if(unchanged){out = x;}
   
   return std::forward_as_tuple(out, unchanged);
