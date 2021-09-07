@@ -177,6 +177,7 @@ sidebar <- dashboardSidebar(
                 menuItem("Simulate",tabName = "Sim"),
                 menuItem("Other plots",tabName = "Plots"),
                 menuItem("Gif",tabName = "Gif"),
+                menuItem("Comparison", tabName = "Comparison"),
                 hr(),
                     materialSwitch("set_limits","Set plot limits"),
                     conditionalPanel(condition = 'input.set_limits',
@@ -252,7 +253,8 @@ body <- dashboardBody(
                         fluidRow(
                             column(
                                 width = 12,
-                                actionButton("simulate","Simulate Reaction")
+                                actionButton("simulate","Simulate Reaction"),
+                                actionButton("save_sim","Save simulation data for comparison")
                             )
                         )
                         ),
@@ -308,11 +310,34 @@ body <- dashboardBody(
                         ),
                         title = "Violin plot",
                         status = "primary", solidHeader = TRUE
-                    )
+                    ),
+                    box(width = NULL,
+                        column(width = 12,
+                               downloadButton("download_HC_val_data","Download Data"),
+                               div(style = 'overflow-x: scroll', DT::dataTableOutput("HC_datatable")),
+                               downloadButton("download_HC_val_plot","Download Plot"),
+                               splitLayout(
+                                 numericInput("HC_val_line_size","Point size", value = 2, width = '150px'),
+                                 numericInput("HC_val_point_size","Point size", value = 3, width = '150px')
+                               ),
+                               plotOutput("HC_val_plot", height = "600px")
+                        ),
+                        title = "Hydrocarbon H/C values",
+                        status = "primary", solidHeader = TRUE
+                    ),
                 )),
         tabItem(tabName = "Gif",
                 fluidPage(
                     imageOutput("vk_gif")
+                )),
+        tabItem(tabName = "Comparison",
+                fluidPage(
+                    box(width = NULL,
+                        plotlyOutput("comparison_plot", height = "600px"),
+                        div(style = 'overflow-x: scroll', DT::dataTableOutput("stored_data")),
+                        collapsible = TRUE, title = "Comparison", status = "primary", solidHeader = TRUE
+                    )
+                    
                 ))
         
         
@@ -336,6 +361,8 @@ ui <- dashboardPage(
 # Setup Server ------------------------------------------------------------
 
 server <- function(input, output, session) {
+    
+    reactive_values <- reactiveValues()  
    
     raw_masslist<-reactive({
         req(!is.null(input$file_input))
@@ -353,10 +380,6 @@ server <- function(input, output, session) {
                )
         
     })
-    
-    
-    
-    
     
     # output$debug <- renderText({
     #     input$list_input
@@ -462,6 +485,25 @@ server <- function(input, output, session) {
                    ID = as.numeric(ID)) 
     })
     
+
+# Save simulation data ----------------------------------------------------
+
+    observeEvent(input$save_sim,{
+        reactive_values$sim_data[[length(reactive_values$sim_data)+1]] <- tidy_data()
+        reactive_values$reaction_data[[length(reactive_values$reaction_data)+1]] <- reaction_details()
+        save_message <- glue("Data saved, currently {length(reactive_values$sim_data)} simulations stored")
+        id_string <- stringr::str_c(paste0(reaction_details()$reaction,"(",reaction_details()$rep,")"))
+        cat(paste("id_string:",id_string))
+        
+        showNotification(ui = save_message)
+    })
+    
+    observeEvent(input$clear_list,{
+        reactive_values$sim_data <- NULL
+        reactive_values$reaction_data <- NULL
+    })
+    
+      
 
 # Iteration details -------------------------------------------------------
 
@@ -772,6 +814,73 @@ server <- function(input, output, session) {
                             dpi = input$dpiGraph)
         } 
     )
+    
+
+# H/C material ------------------------------------------------------------
+
+  HC_data <-reactive({
+    req(tidy_data())
+    filter_iter(tidy_data()) %>%
+      filter(O == 0) %>%
+      mutate(HC_val = case_when(
+        H_C <= 0.67 ~ "Aromatic",
+        H_C <= 1.57 ~ "Napthenic",
+        H_C < 2 ~ "Other H/C < 2",
+        H_C >= 2 ~ "Paraffinic",
+        TRUE ~ "Other"
+      )) %>%
+      group_by(Iter, HC_val) %>%
+      summarise(n = n())
+  })  
+    
+    output$HC_datatable <- DT::renderDataTable({
+      req(HC_data())
+      HC_data()
+    })  
+    
+    HC_val_plot <- reactive({
+      req(HC_data())
+      HC_data() %>%
+        ggplot(aes(Iter,n, colour = HC_val, linetype = HC_val))+
+        geom_line(size = input$HC_val_line_size)+
+        geom_point(size = input$HC_val_point_size)+
+        labs(
+          y = "Number of molecules",
+          x = "Iteration",
+          colour = "Hydrocarbon type",
+          linetype = "Hydrocarbon type"
+        )+
+        scale_x_continuous(n.breaks = 10) +
+        theme(text = element_text(size = input$textSize))
+    })
+    
+    output$HC_val_plot <- renderPlot({
+      HC_val_plot()
+    })
+    
+    output$download_HC_val_plot <- downloadHandler(
+      filename =  function() {
+        paste("HC_val_plot", input$plot_format, sep=".")
+      },
+      # content is a function with argument file. content writes the plot to the device
+      content = function(file) {
+        multi_save_plot(file, plot =  HC_val_plot(),
+                        type = input$plot_format,
+                        width = input$widthGraph,
+                        height = input$heightGraph,
+                        units = input$unitsGraph,
+                        dpi = input$dpiGraph)
+      } 
+    )
+    
+    output$download_HC_val_data <- downloadHandler(
+      filename = function() {
+        paste("HC_data", ".csv", sep = "")
+      },
+      content = function(file) {
+        write_csv(HC_data(), file)
+      }
+    )
 
 # Generate gif ------------------------------------------------------------
     output$vk_gif <- renderImage({
@@ -795,6 +904,19 @@ server <- function(input, output, session) {
         )}, deleteFile = TRUE)
     
     
+
+# Comparison Section ------------------------------------------------------
+
+    stored_data<-reactive({
+        req(!is.null(reactive_values$reaction_data))
+        reactive_values$reaction_data %>%
+            map_chr(~stringr::str_c(paste0(.x$reaction,"(",.x$rep,")")))
+    })
+    
+    output$stored_data <- DT::renderDataTable({
+        req(stored_data())
+        tibble(id_string = stored_data())
+    })
         
 # End ---------------------------------------------------------------------
     
