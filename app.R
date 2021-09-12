@@ -109,30 +109,7 @@ theme_custom <- function (
             axis.title.x = element_text(face = "bold"))}
 
 
-atom_check<-function(formula){
-    str_extract_all(formula,'([A-Z][a-z]?)') %>%
-        map_lgl(~all(.x %in% c("C","H","N","O","S")))
-}
 
-ion_polarity_finder <- function(data){
-    output <- data %>%
-        mutate(electron_status = ifelse (dbe != as.integer(dbe),'even','odd')) %>%
-        filter(electron_status == 'even' & atom_check(formula)) %>%
-        mutate(calc = C-H/2+N/2+1) %>%
-        mutate(polarity = ifelse(calc-dbe==-0.5,'neg','pos')) %>%
-        pull(polarity)
-    
-    if(length(unique(output))!=1){stop("Something went wrong")}
-    return(unique(output))
-}
-
-adjust_H<-function(H, electron_status, ion_polarity){
-    case_when(
-        electron_status == "even" & ion_polarity == "neg" ~ H + 1,
-        electron_status == "even" & ion_polarity == "pos" ~ H - 1,
-        electron_status == "odd" ~ H + 0
-    )
-}
 
 multi_save_plot<-function(file,plot,type,width,height,units,dpi){
     switch(type,
@@ -210,11 +187,12 @@ body <- dashboardBody(
                     box(width = NULL,
                         selectInput("file_type","Select input type",choices = c("Composer64","C,H,O values" = "CHO")),
                         fileInput(inputId = "file_input",
-                                  label = "Choose data",
+                                  label = "Upload data",
                                   multiple= TRUE,
                                   accept = c("text/csv",
                                              "text/comma-separated-values,text/plain",
-                                             ".csv"))
+                                             ".csv")),
+                        selectizeInput("masslist_selector","Choose an uploaded masslist to use", choices = "")
                         ),
                     box(width = NULL,
                         materialSwitch("filter_mass","Filter by m/z"),
@@ -254,6 +232,7 @@ body <- dashboardBody(
                             column(
                                 width = 12,
                                 actionButton("simulate","Simulate Reaction"),
+                                textInput("sim_name","ID to use"),
                                 actionButton("save_sim","Save simulation data for comparison")
                             )
                         )
@@ -333,8 +312,15 @@ body <- dashboardBody(
         tabItem(tabName = "Comparison",
                 fluidPage(
                     box(width = NULL,
-                        plotlyOutput("comparison_plot", height = "600px"),
                         div(style = 'overflow-x: scroll', DT::dataTableOutput("stored_data")),
+                        plotOutput("combined_vk_plot", height = "600px"),
+                        plotOutput("combined_class_plot", height = "600px"),
+                        materialSwitch("combined_violin_filter_classes","Filter classes"),
+                        conditionalPanel(condition = 'input.combined_violin_filter_classes',
+                                         selectizeInput("combined_violin_class_filter","Select classes", choices = c("HC", "O1"), multiple = TRUE)
+                        ),
+                        plotOutput("combined_violin_plot", height = "600px"),
+                        plotOutput("combined_HC_val_plot", height = "600px"),
                         collapsible = TRUE, title = "Comparison", status = "primary", solidHeader = TRUE
                     )
                     
@@ -364,28 +350,62 @@ server <- function(input, output, session) {
     
     reactive_values <- reactiveValues()  
    
-    raw_masslist<-reactive({
-        req(!is.null(input$file_input))
-        validate(
-            check_file_input(file_path = input$file_input$datapath,
-                             file_type = input$file_type)
-        )
-        switch(input$file_type,
-               "Composer64" = KairosMSfunctions::Master_ReadeR(file_to_read = input$file_input$datapath),
-               "CHO" = readr::read_csv(input$file_input$datapath, col_types = cols(
-                   C = col_double(),
-                   H = col_double(),
-                   O = col_number()
-               ))
-               )
-        
-    })
+    # raw_masslist<-reactive({
+    #     req(!is.null(input$file_input))
+    #     validate(
+    #         check_file_input(file_path = input$file_input$datapath,
+    #                          file_type = input$file_type)
+    #     )
+    #     switch(input$file_type,
+    #                     "Composer64" = KairosMSfunctions::Master_ReadeR(file_to_read = input$file_input$datapath) %>%
+    #                       filter(.,isotope == FALSE) %>%
+    #                       filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
+    #                       mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')),
+    #                     "CHO" = readr::read_csv(input$file_input$datapath, col_types = cols(
+    #                       C = col_double(),
+    #                       H = col_double(),
+    #                       O = col_number()
+    #                     )) %>%
+    #                       mutate(.,
+    #                              assigned.mz = C*12 + H + O*16,
+    #                              dbe = C -H/2 +1
+    #                       )
+    #              )
+    #     
+    # })
     
     # output$debug <- renderText({
     #     input$list_input
     #     })
     
-    
+    observeEvent(input$file_input,{
+      req(!is.null(input$file_input))
+      validate(
+        check_file_input(file_path = input$file_input$datapath,
+                         file_type = input$file_type)
+      )
+      file<-switch(input$file_type,
+             "Composer64" = KairosMSfunctions::Master_ReadeR(file_to_read = input$file_input$datapath) %>%
+               filter(.,isotope == FALSE) %>%
+               filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
+               mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')),
+             "CHO" = readr::read_csv(input$file_input$datapath, col_types = cols(
+               C = col_double(),
+               H = col_double(),
+               O = col_number()
+             )) %>%
+               mutate(.,
+                      assigned.mz = C*12 + H + O*16,
+                      dbe = C -H/2 +1
+               )
+      )
+      
+      filename <- str_extract(input$file_input$name,'.+(?=.csv)')
+      reactive_values$raw_masslists[[length(reactive_values$raw_masslists)+1]] <- file
+      reactive_values$masslist_names[[length(reactive_values$masslist_names)+1]] <- filename
+
+    }
+                 )
     
 
 # Reaction details input --------------------------------------------------
@@ -418,24 +438,15 @@ server <- function(input, output, session) {
 
 # Prepare data ------------------------------------------------------------
 
+    observe({
+      req(length(reactive_values$raw_masslists) > 0)
+      updateSelectInput(session = shiny::getDefaultReactiveDomain(), inputId = "masslist_selector", label = "Choose an uploaded masslist to use", choices = unlist(reactive_values$masslist_names))
+    })
+    
     
     filtered_data <- reactive({
-        req(raw_masslist())
-        raw_masslist() %>%
-            {
-                if(all(c("assigned.mz","peak.mz") %in% colnames(.))) 
-                    {
-                    filter(.,isotope == FALSE) %>%
-                        filter(str_detect(class,"N|S|B|Na", negate = TRUE)) %>%
-                        mutate(electron_status = ifelse(dbe != as.integer(dbe),'even','odd')) 
-                    
-                    } else {
-                        mutate(.,
-                               assigned.mz = C*12 + H + O*16,
-                               dbe = C -H/2 +1
-                        )
-                    }
-            } %>%
+        req(length(reactive_values$raw_masslists) > 0)
+      reactive_values$raw_masslists[[match(input$masslist_selector,reactive_values$masslist_names)]] %>%
             {if(input$filter_mass) filter(., between(assigned.mz,input$filter_mz[[1]],input$filter_mz[[2]])) else .} %>%
             {if(input$filter_data) filter(., 
                                           between(C,input$filter_carbon[[1]],input$filter_carbon[[2]]) &
@@ -444,7 +455,6 @@ server <- function(input, output, session) {
                                               between(O/C,input$filter_OC[[1]],input$filter_OC[[2]])
                                               
                                           ) else .}
-            #mutate(nH = adjust_H(H, electron_status, ion_polarity)) 
     })
     
     starting_data <- reactive({
@@ -489,11 +499,24 @@ server <- function(input, output, session) {
 # Save simulation data ----------------------------------------------------
 
     observeEvent(input$save_sim,{
+        req(tidy_data())
+        
+        sim_name <- if (input$sim_name != ""){
+          input$sim_name
+        }else{
+          paste0("simulation", length(reactive_values$sim_data))
+        }
+        
+        validate(
+          need(!sim_name %in% reactive_values$sim_name, "Name has already been used")
+        )
+        
         reactive_values$sim_data[[length(reactive_values$sim_data)+1]] <- tidy_data()
-        reactive_values$reaction_data[[length(reactive_values$reaction_data)+1]] <- reaction_details()
-        save_message <- glue("Data saved, currently {length(reactive_values$sim_data)} simulations stored")
-        id_string <- stringr::str_c(paste0(reaction_details()$reaction,"(",reaction_details()$rep,")"))
-        cat(paste("id_string:",id_string))
+        #reactive_values$reaction_data[[length(reactive_values$reaction_data)+1]] <- reaction_details
+        reactive_values$sim_name[[length(reactive_values$sim_name)+1]] <- sim_name
+        
+        save_message <- glue("Data saved with name {sim_name},
+                             currently {length(reactive_values$sim_data)} simulations stored")
         
         showNotification(ui = save_message)
     })
@@ -501,6 +524,7 @@ server <- function(input, output, session) {
     observeEvent(input$clear_list,{
         reactive_values$sim_data <- NULL
         reactive_values$reaction_data <- NULL
+        reactive_values$sim_name <- NULL
     })
     
       
@@ -830,7 +854,7 @@ server <- function(input, output, session) {
         TRUE ~ "Other"
       )) %>%
       group_by(Iter, HC_val) %>%
-      summarise(n = n())
+      summarise(n = n(), .groups = "drop")
   })  
     
     output$HC_datatable <- DT::renderDataTable({
@@ -908,14 +932,174 @@ server <- function(input, output, session) {
 # Comparison Section ------------------------------------------------------
 
     stored_data<-reactive({
-        req(!is.null(reactive_values$reaction_data))
-        reactive_values$reaction_data %>%
-            map_chr(~stringr::str_c(paste0(.x$reaction,"(",.x$rep,")")))
+        req(!is.null(reactive_values$sim_data))
+      # 
+      # reaction <- reactive_values$reaction_data %>%
+      #   map_chr(~stringr::str_c(paste0(.x$reaction,"(",.x$rep,")")))
+
+        tibble(ID = reactive_values$sim_name)
     })
-    
+
     output$stored_data <- DT::renderDataTable({
         req(stored_data())
-        tibble(id_string = stored_data())
+      stored_data()
+    })
+    
+    observeEvent(input$clear_list,{
+      reactive_values$sim_data <- NULL
+      reactive_values$reaction_data <- NULL
+      reactive_values$sim_name <- NULL
+    })
+    
+    
+
+## Combined VK -------------------------------------------------------------
+
+    
+    combined_vk_plot <- reactive({
+      req(!is.null(reactive_values$sim_data))
+      reactive_values$sim_data %>%
+        set_names(.,reactive_values$sim_name) %>%
+        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+        group_by(.,H_C, O_C, Iter) %>%
+        mutate(n = n()) %>%
+        ggplot(aes(O_C, H_C, fill = id, size = n)) +
+        geom_point(shape = 21) +
+        scale_fill_viridis_d(end = .8) +
+        labs(
+          y = "H/C",
+          x = "O/C",
+          fill = "Sample"
+        ) +
+        {if(input$set_limits) expand_limits(x = input$set_limits_x, y = input$set_limits_y)} +
+        theme(text = element_text(size = input$textSize))
+        
+    })
+    
+    output$combined_vk_plot <- renderPlot({
+      combined_vk_plot()
+    })
+    
+
+## Combined class plot -----------------------------------------------------
+
+    combined_class_plot<- reactive({
+      req(!is.null(reactive_values$sim_data))
+      reactive_values$sim_data %>%
+        set_names(.,reactive_values$sim_name) %>%
+        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+        mutate(class = case_when(
+          O == 0 ~ "HC",
+          O > 0 ~ paste0("O",O)
+        )) %>%
+        group_by(id, class) %>%
+        summarise(n = n(), .groups = "drop") %>%
+        complete(class,id, fill = list(n = 0)) %>%
+        ggplot(aes(
+          x = factor(class, levels = str_sort(unique(class), numeric = TRUE), ordered = TRUE),
+          y = n,
+          fill = id
+        )) +
+        geom_col(position = position_dodge2(preserve = "single")) +
+        scale_fill_viridis_d(end = .8) +
+        labs(
+          y = "Number of molecules",
+          x = "Heteroatom class",
+          fill = "Sample"
+        )+
+        theme(text = element_text(size = input$textSize))
+      
+    }) 
+    
+    output$combined_class_plot <- renderPlot({
+      combined_class_plot()
+    })
+
+## Combined violin ---------------------------------------------------------
+
+    
+    
+    observe({
+      req(!is.null(reactive_values$sim_data))
+      updateSelectInput(session = shiny::getDefaultReactiveDomain(),
+                        inputId = "combined_violin_class_filter",
+                        label = "Select classes",
+                        choices = get_classes(map_df(reactive_values$sim_data,~filter(.x, Iter == max(Iter))))
+      )
+    })
+    
+    combined_violin_plot <- reactive({
+      req(!is.null(reactive_values$sim_data))
+      reactive_values$sim_data %>%
+        set_names(.,reactive_values$sim_name) %>%
+        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+        mutate(class = case_when(
+          O == 0 ~ "HC",
+          O > 0 ~ paste0("O",O)
+        )) %>%
+        {if(input$combined_violin_filter_classes) filter(., class %in% input$combined_violin_class_filter) else .} %>%
+        ggplot(aes(
+          x = factor(class, levels = str_sort(unique(class), numeric = TRUE), ordered = TRUE),
+          y = H_C,
+          fill = id
+        )) +
+        geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))+
+        scale_fill_viridis_d(end = .8) +
+        labs(
+          y = "H/C",
+          x = "Heteroatom class",
+          fill = "Sample"
+        ) +
+        {if(input$set_limits) expand_limits(y = input$set_limits_y)}+
+        theme(text = element_text(size = input$textSize))
+      
+    })
+    
+    output$combined_violin_plot <- renderPlot({
+      combined_violin_plot()
+    })
+    
+    ## Combined H/C material ------------------------------------------------------------
+    
+    combined_HC_data <-reactive({
+      req(!is.null(reactive_values$sim_data))
+      reactive_values$sim_data %>%
+        set_names(.,reactive_values$sim_name) %>%
+        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+        filter(O == 0) %>%
+        mutate(HC_val = case_when(
+          H_C <= 0.67 ~ "Aromatic",
+          H_C <= 1.57 ~ "Napthenic",
+          H_C < 2 ~ "Other H/C < 2",
+          H_C >= 2 ~ "Paraffinic",
+          TRUE ~ "Other"
+        )) %>%
+        group_by(id, HC_val) %>%
+        summarise(n = n(), .groups = "drop")
+    })  
+    
+    output$combined_HC_datatable <- DT::renderDataTable({
+      req(combined_HC_data())
+      combined_HC_data()
+    })  
+    
+    combined_HC_val_plot <- reactive({
+      req(combined_HC_data())
+      combined_HC_data() %>%
+        ggplot(aes(id, n, colour = HC_val, linetype = HC_val))+
+        geom_line(size = input$HC_val_line_size)+
+        geom_point(size = input$HC_val_point_size)+
+        labs(
+          y = "Number of molecules",
+          x = "sample",
+          colour = "Hydrocarbon type",
+          linetype = "Hydrocarbon type"
+        )+
+        theme(text = element_text(size = input$textSize))
+    })
+    
+    output$combined_HC_val_plot <- renderPlot({
+      combined_HC_val_plot()
     })
         
 # End ---------------------------------------------------------------------
