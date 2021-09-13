@@ -314,14 +314,18 @@ body <- dashboardBody(
                     box(width = NULL,
                         div(style = 'overflow-x: scroll', DT::dataTableOutput("stored_data")),
                         actionButton("clear_entry","Delete selected entry"),
-                        selectizeInput("selected_entry","select entry to delete",choices = ""),
+                        selectizeInput("selected_entries","select data to use",choices = "", multiple = TRUE),
+                        downloadButton("download_combined_vk_plot","Download Plot"),
                         plotOutput("combined_vk_plot", height = "600px"),
+                        downloadButton("download_combined_class_plot","Download Plot"),
                         plotlyOutput("combined_class_plot", height = "600px"),
                         materialSwitch("combined_violin_filter_classes","Filter classes"),
                         conditionalPanel(condition = 'input.combined_violin_filter_classes',
                                          selectizeInput("combined_violin_class_filter","Select classes", choices = c("HC", "O1"), multiple = TRUE)
                         ),
+                        downloadButton("download_combined_violin_plot","Download Plot"),
                         plotOutput("combined_violin_plot", height = "600px"),
+                        downloadButton("download_combined_HC_val_plot","Download Plot"),
                         plotOutput("combined_HC_val_plot", height = "600px"),
                         collapsible = TRUE, title = "Comparison", status = "primary", solidHeader = TRUE
                     )
@@ -950,8 +954,8 @@ server <- function(input, output, session) {
     observe({
       req(!is.null(reactive_values$sim_data))
       updateSelectInput(session = shiny::getDefaultReactiveDomain(),
-                        inputId = "selected_entry",
-                        "select entry to delete",
+                        inputId = "selected_entries",
+                        "select data to use",
                         choices = unlist(reactive_values$sim_names)
       )
       updateSelectInput(session = shiny::getDefaultReactiveDomain(),
@@ -962,11 +966,7 @@ server <- function(input, output, session) {
     })
     
     
-    observeEvent(input$clear_entry,{
-      entry<-match(input$selected_entry, unlist(reactive_values$sim_names))
-      reactive_values$sim_data[[entry]] <- NULL
-      reactive_values$sim_names[[entry]] <- NULL
-    })
+    
     
     
     # observeEvent(input$clear_list,{
@@ -975,17 +975,26 @@ server <- function(input, output, session) {
     #   reactive_values$sim_names <- NULL
     # })
     
+    combined_data<-reactive({
+      req(length(reactive_values$sim_data) > 0)
+      req(length(reactive_values$sim_names) > 0)
+      
+      
+      
+      reactive_values$sim_data %>%
+        set_names(.,reactive_values$sim_names) %>%
+        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+        filter(id %in% input$selected_entries)
+    })
     
 
 ## Combined VK -------------------------------------------------------------
 
     
     combined_vk_plot <- reactive({
-      req(length(reactive_values$sim_data)>0)
+      req(combined_data())
       
-      reactive_values$sim_data %>%
-        set_names(.,reactive_values$sim_names) %>%
-        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+      combined_data() %>%
         group_by(.,H_C, O_C, Iter) %>%
         mutate(n = n()) %>%
         ggplot(aes(O_C, H_C, fill = id, size = n)) +
@@ -1005,15 +1014,28 @@ server <- function(input, output, session) {
       combined_vk_plot()
     })
     
+    output$download_combined_vk_plot <- downloadHandler(
+      filename =  function() {
+        paste("combined_vk_plot", input$plot_format, sep=".")
+      },
+      # content is a function with argument file. content writes the plot to the device
+      content = function(file) {
+        multi_save_plot(file, plot =  combined_vk_plot(),
+                        type = input$plot_format,
+                        width = input$widthGraph,
+                        height = input$heightGraph,
+                        units = input$unitsGraph,
+                        dpi = input$dpiGraph)
+      } 
+    )
+    
 
 ## Combined class plot -----------------------------------------------------
 
     combined_class_plot<- reactive({
-      req(length(reactive_values$sim_data)>0)
+      req(combined_data())
       
-      reactive_values$sim_data %>%
-        set_names(.,reactive_values$sim_names) %>%
-        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+      combined_data() %>%
         mutate(class = case_when(
           O == 0 ~ "HC",
           O > 0 ~ paste0("O",O)
@@ -1040,6 +1062,21 @@ server <- function(input, output, session) {
     output$combined_class_plot <- renderPlotly({
       ggplotly(combined_class_plot())
     })
+    
+    output$download_combined_class_plot <- downloadHandler(
+      filename =  function() {
+        paste("combined_class_plot", input$plot_format, sep=".")
+      },
+      # content is a function with argument file. content writes the plot to the device
+      content = function(file) {
+        multi_save_plot(file, plot =  combined_class_plot(),
+                        type = input$plot_format,
+                        width = input$widthGraph,
+                        height = input$heightGraph,
+                        units = input$unitsGraph,
+                        dpi = input$dpiGraph)
+      } 
+    )
 
 ## Combined violin ---------------------------------------------------------
 
@@ -1048,11 +1085,9 @@ server <- function(input, output, session) {
     
     
     combined_violin_plot <- reactive({
-      req(length(reactive_values$sim_data)>0)
+      req(combined_data())
       
-      reactive_values$sim_data %>%
-        set_names(.,reactive_values$sim_names) %>%
-        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+      combined_data() %>%
         mutate(class = case_when(
           O == 0 ~ "HC",
           O > 0 ~ paste0("O",O)
@@ -1079,14 +1114,27 @@ server <- function(input, output, session) {
       combined_violin_plot()
     })
     
+    output$download_combined_violin_plot <- downloadHandler(
+      filename =  function() {
+        paste("combined_violin_plot", input$plot_format, sep=".")
+      },
+      # content is a function with argument file. content writes the plot to the device
+      content = function(file) {
+        multi_save_plot(file, plot =  combined_violin_plot(),
+                        type = input$plot_format,
+                        width = input$widthGraph,
+                        height = input$heightGraph,
+                        units = input$unitsGraph,
+                        dpi = input$dpiGraph)
+      } 
+    )
+    
     ## Combined H/C material ------------------------------------------------------------
     
     combined_HC_data <-reactive({
-      req(length(reactive_values$sim_data)>0)
+      req(combined_data())
       
-      reactive_values$sim_data %>%
-        set_names(.,reactive_values$sim_names) %>%
-        map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
+      combined_data() %>%
         filter(O == 0) %>%
         mutate(HC_val = case_when(
           H_C <= 0.67 ~ "Aromatic",
@@ -1122,6 +1170,21 @@ server <- function(input, output, session) {
     output$combined_HC_val_plot <- renderPlot({
       combined_HC_val_plot()
     })
+    
+    output$download_combined_HC_val_plot <- downloadHandler(
+      filename =  function() {
+        paste("combined_HC_val_plot", input$plot_format, sep=".")
+      },
+      # content is a function with argument file. content writes the plot to the device
+      content = function(file) {
+        multi_save_plot(file, plot =  combined_HC_val_plot(),
+                        type = input$plot_format,
+                        width = input$widthGraph,
+                        height = input$heightGraph,
+                        units = input$unitsGraph,
+                        dpi = input$dpiGraph)
+      } 
+    )
         
 # End ---------------------------------------------------------------------
     
