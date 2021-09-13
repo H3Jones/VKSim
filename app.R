@@ -232,7 +232,8 @@ body <- dashboardBody(
                             column(
                                 width = 12,
                                 actionButton("simulate","Simulate Reaction"),
-                                textInput("sim_names","ID to use"),
+                                hr(),
+                                textInput("sim_names","ID to use", width = '30%'),
                                 actionButton("save_sim","Save simulation data for comparison")
                             )
                         )
@@ -312,9 +313,11 @@ body <- dashboardBody(
         tabItem(tabName = "Comparison",
                 fluidPage(
                     box(width = NULL,
-                        div(style = 'overflow-x: scroll', DT::dataTableOutput("stored_data")),
-                        actionButton("clear_entry","Delete selected entry"),
-                        selectizeInput("selected_entries","select data to use",choices = "", multiple = TRUE),
+                        tableOutput("stored_data"),
+                        pickerInput("selected_entries","Select data to use",choices = "", multiple = TRUE),
+                        collapsible = TRUE, title = "Comparison Options", status = "primary", solidHeader = TRUE
+                        ),
+                    box(width = NULL,
                         downloadButton("download_combined_vk_plot","Download Plot"),
                         plotOutput("combined_vk_plot", height = "600px"),
                         downloadButton("download_combined_class_plot","Download Plot"),
@@ -327,7 +330,7 @@ body <- dashboardBody(
                         plotOutput("combined_violin_plot", height = "600px"),
                         downloadButton("download_combined_HC_val_plot","Download Plot"),
                         plotOutput("combined_HC_val_plot", height = "600px"),
-                        collapsible = TRUE, title = "Comparison", status = "primary", solidHeader = TRUE
+                        collapsible = TRUE, title = "Comparison Plots", status = "primary", solidHeader = TRUE
                     )
                     
                 ))
@@ -946,17 +949,17 @@ server <- function(input, output, session) {
         tibble(ID = reactive_values$sim_names)
     })
 
-    output$stored_data <- DT::renderDataTable({
+    output$stored_data <- renderTable({
         req(stored_data())
       stored_data()
     })
     
     observe({
       req(!is.null(reactive_values$sim_data))
-      updateSelectInput(session = shiny::getDefaultReactiveDomain(),
+      updatePickerInput(session = shiny::getDefaultReactiveDomain(),
                         inputId = "selected_entries",
-                        "select data to use",
-                        choices = unlist(reactive_values$sim_names)
+                        "Select data to use",
+                        choices = reactive_values$sim_names
       )
       updateSelectInput(session = shiny::getDefaultReactiveDomain(),
                         inputId = "combined_violin_class_filter",
@@ -966,25 +969,18 @@ server <- function(input, output, session) {
     })
     
     
-    
-    
-    
-    # observeEvent(input$clear_list,{
-    #   reactive_values$sim_data <- NULL
-    #   reactive_values$reaction_data <- NULL
-    #   reactive_values$sim_names <- NULL
-    # })
-    
     combined_data<-reactive({
       req(length(reactive_values$sim_data) > 0)
       req(length(reactive_values$sim_names) > 0)
       
       
       
-      reactive_values$sim_data %>%
+      data <- reactive_values$sim_data %>%
         set_names(.,reactive_values$sim_names) %>%
         map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
         filter(id %in% input$selected_entries)
+      
+      if(nrow(data) >0) return(data) else return(NULL)
     })
     
 
@@ -1155,14 +1151,12 @@ server <- function(input, output, session) {
     combined_HC_val_plot <- reactive({
       req(combined_HC_data())
       combined_HC_data() %>%
-        ggplot(aes(id, n, colour = HC_val, linetype = HC_val))+
-        geom_line(size = input$HC_val_line_size)+
+        ggplot(aes(id, n, colour = HC_val))+
         geom_point(size = input$HC_val_point_size)+
         labs(
           y = "Number of molecules",
           x = "sample",
-          colour = "Hydrocarbon type",
-          linetype = "Hydrocarbon type"
+          colour = "Hydrocarbon type"
         )+
         theme(text = element_text(size = input$textSize))
     })
