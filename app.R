@@ -299,7 +299,7 @@ body <- dashboardBody(
                                  numericInput("HC_val_line_size","Point size", value = 2, width = '150px'),
                                  numericInput("HC_val_point_size","Point size", value = 3, width = '150px')
                                ),
-                               plotOutput("HC_val_plot", height = "600px")
+                               plotlyOutput("HC_val_plot", height = "600px")
                         ),
                         title = "Hydrocarbon H/C values",
                         status = "primary", solidHeader = TRUE
@@ -328,7 +328,7 @@ body <- dashboardBody(
                         downloadButton("download_combined_violin_plot","Download Plot"),
                         plotOutput("combined_violin_plot", height = "600px"),
                         downloadButton("download_combined_HC_val_plot","Download Plot"),
-                        plotOutput("combined_HC_val_plot", height = "600px"),
+                        plotlyOutput("combined_HC_val_plot", height = "600px"),
                         collapsible = TRUE, title = "Comparison Plots", status = "primary", solidHeader = TRUE
                     )
                     
@@ -887,8 +887,8 @@ server <- function(input, output, session) {
         theme(text = element_text(size = input$textSize))
     })
     
-    output$HC_val_plot <- renderPlot({
-      HC_val_plot()
+    output$HC_val_plot <- renderPlotly({
+      ggplotly(HC_val_plot())
     })
     
     output$download_HC_val_plot <- downloadHandler(
@@ -1162,8 +1162,8 @@ server <- function(input, output, session) {
         theme(text = element_text(size = input$textSize))
     })
     
-    output$combined_HC_val_plot <- renderPlot({
-      combined_HC_val_plot()
+    output$combined_HC_val_plot <- renderPlotly({
+      ggplotly(combined_HC_val_plot())
     })
     
     output$download_combined_HC_val_plot <- downloadHandler(
