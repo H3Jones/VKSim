@@ -855,10 +855,10 @@ server <- function(input, output, session) {
     filter_iter(tidy_data()) %>%
       filter(O == 0) %>%
       mutate(HC_val = case_when(
-        H_C <= 0.67 ~ "Aromatic",
-        H_C <= 1.67 ~ "Napthenic",
-        H_C < 2 ~ "Other H/C < 2",
-        H_C >= 2 ~ "Paraffinic",
+        H_C <= 0.67 ~ "Condensed aromatic",
+        H_C <= 1.67 ~ "0.67<H/C<1.67",
+        H_C <= 2 ~ "1.67< H/C <= 2",
+        H_C > 2 ~ "Paraffinic",
         TRUE ~ "Other"
       )) %>%
       group_by(Iter, HC_val) %>%
@@ -1133,10 +1133,10 @@ server <- function(input, output, session) {
       combined_data() %>%
         filter(O == 0) %>%
         mutate(HC_val = case_when(
-          H_C <= 0.67 ~ "Aromatic",
-          H_C <= 1.57 ~ "Napthenic",
-          H_C < 2 ~ "Other H/C < 2",
-          H_C >= 2 ~ "Paraffinic",
+          H_C <= 0.67 ~ "Condensed aromatic",
+          H_C <= 1.67 ~ "0.67<H/C<1.67",
+          H_C <= 2 ~ "1.67< H/C <= 2",
+          H_C > 2 ~ "Paraffinic",
           TRUE ~ "Other"
         )) %>%
         group_by(id, HC_val) %>%
