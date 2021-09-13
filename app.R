@@ -57,7 +57,7 @@ tidy_reaction <- function(starting_data, reactions, min_dbe = 0){
         transpose() %>%
         simplify_all()
     
-    generateReactions(input_data, reactions, min_dbe)
+    output_data <- generateReactions(input_data, reactions, min_dbe)
     
     tidy_output <- map_df(flatten(output_data),~bind_rows(.x, .id = "ID"), .id = "Iter") %>%
         bind_rows(.,rowid_to_column(starting_data, var = "ID") %>% mutate(ID = as.character(ID), "Iter" = "0")) %>%
@@ -139,7 +139,6 @@ suppressPackageStartupMessages(c(
     library(gganimate)
 ))
 
-#Rcpp::sourceCpp("VKSim_cpp_funs.cpp")
 Rcpp::sourceCpp("VKSim_improved.cpp")
 
 theme_set(theme_custom())
@@ -874,16 +873,17 @@ server <- function(input, output, session) {
     HC_val_plot <- reactive({
       req(HC_data())
       HC_data() %>%
-        ggplot(aes(Iter,n, colour = HC_val, linetype = HC_val))+
-        geom_line(size = input$HC_val_line_size)+
-        geom_point(size = input$HC_val_point_size)+
+        ggplot(aes(Iter,n, fill = HC_val))+
+        # geom_line(size = input$HC_val_line_size)+
+        # geom_point(size = input$HC_val_point_size)+
+        geom_col(colour = "black") +
         labs(
           y = "Number of molecules",
           x = "Iteration",
-          colour = "Hydrocarbon type",
-          linetype = "Hydrocarbon type"
+          fill = "Hydrocarbon type"
         )+
-        scale_x_continuous(n.breaks = 10) +
+        scale_x_continuous(breaks = scales::breaks_extended(10)) +
+        scale_fill_viridis_d(end = .8)+
         theme(text = element_text(size = input$textSize))
     })
     
@@ -1151,13 +1151,14 @@ server <- function(input, output, session) {
     combined_HC_val_plot <- reactive({
       req(combined_HC_data())
       combined_HC_data() %>%
-        ggplot(aes(id, n, colour = HC_val))+
-        geom_point(size = input$HC_val_point_size)+
+        ggplot(aes(id, n, fill = HC_val))+
+        geom_col(colour = "black")+
         labs(
           y = "Number of molecules",
-          x = "sample",
-          colour = "Hydrocarbon type"
+          x = "Sample",
+          fill = "Hydrocarbon type"
         )+
+        scale_fill_viridis_d(end = .8)+
         theme(text = element_text(size = input$textSize))
     })
     
