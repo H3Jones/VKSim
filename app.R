@@ -190,6 +190,7 @@ body <- dashboardBody(
                     box(width = NULL,
                         tableOutput("stored_data"),
                         pickerInput("selected_entries","Select data to use",choices = "", multiple = TRUE),
+                        materialSwitch("merge_data","Combine selected data"),
                         collapsible = TRUE, title = "Comparison Options", status = "primary", solidHeader = TRUE
                         ),
                     box(width = NULL,
@@ -832,7 +833,8 @@ server <- function(input, output, session) {
       data <- reactive_values$sim_data %>%
         set_names(.,reactive_values$sim_names) %>%
         map_df(~filter(.x, Iter == max(Iter)), .id = "id") %>%
-        filter(id %in% input$selected_entries)
+        filter(id %in% input$selected_entries) %>%
+        {if(input$merge_data) mutate(.,"id" = "Combined") else .}
       
       if(nrow(data) >0) return(data) else return(NULL)
     })
