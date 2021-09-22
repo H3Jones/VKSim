@@ -781,10 +781,10 @@ server <- function(input, output, session) {
             transition_manual(Iter) +
             labs(subtitle = "Iteration: {current_frame}")
         
-        anim_save("outfile.gif", p) # New
+        anim_save(outfile, p) # New
         
         # Return a list containing the filename
-        list(src = "outfile.gif",
+        list(src = outfile,
              contentType = 'image/gif'
              # width = 400,
              # height = 300,
