@@ -2,7 +2,7 @@
 
 #helper functions
 check_CHO_file<-function(file_path){
-  if(all(colnames(readr::read_csv(file_path, n_max = 5)) %in% c("C", "H", "O"))) {
+  if(all(c("C", "H", "O") %in% colnames(readr::read_csv(file_path, n_max = 5)))) {
     return(NULL)
   } else {
     return("Ensure file is the correct type")
